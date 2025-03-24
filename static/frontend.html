@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Text Extractor</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .drop-area {
+            border: 2px dashed #0d6efd;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            background-color: #f1f8ff;
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+        .drop-area.highlight {
+            background-color: #d1e7ff;
+            border-color: #0a58ca;
+        }
+        .file-input {
+            display: none;
+        }
+        .browse-btn {
+            cursor: pointer;
+        }
+        .preview-area {
+            display: none;
+            height: 300px;
+            overflow-y: auto;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: white;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-bottom: 1.5rem;
+        }
+        .preview-area.show {
+            display: block;
+        }
+        .action-buttons {
+            display: none;
+        }
+        .action-buttons.show {
+            display: flex;
+            justify-content: space-between;
+        }
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        .status-area {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+        .file-info {
+            margin-top: 1rem;
+            display: none;
+        }
+        .file-info.show {
+            display: block;
+        }
+        .file-icon {
+            font-size: 2rem;
+            margin-right: 1rem;
+        }
+        .footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5 main-container">
+        <div class="text-center mb-4">
+            <h1 class="display-6">Document Text Extractor</h1>
+            <p class="lead text-muted">Extract text from various document formats</p>
+            <p class="small text-muted">Supported formats: .txt, .docx, .pptx, .pdf, .md</p>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div id="drop-area" class="drop-area">
+                    <i class="fas fa-file-upload fa-3x text-primary mb-3"></i>
+                    <h5>Drag & Drop your file here</h5>
+                    <p>or</p>
+                    <label for="file-input" class="btn btn-primary browse-btn">Browse Files</label>
+                    <input type="file" id="file-input" class="file-input" accept=".txt,.docx,.pptx,.pdf,.md">
+                </div>
+
+                <div id="file-info" class="file-info d-flex align-items-center">
+                    <i id="file-icon" class="file-icon fas fa-file-alt text-primary"></i>
+                    <div>
+                        <h6 id="file-name" class="mb-1">filename.txt</h6>
+                        <p id="file-size" class="text-muted mb-0">Size: 123 KB</p>
+                    </div>
+                </div>
+
+                <div id="status-area" class="status-area alert alert-info d-none">
+                    <div class="d-flex align-items-center">
+                        <div id="processing-spinner" class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span id="status-message">Processing your file...</span>
+                    </div>
+                </div>
+
+                <div id="preview-container" class="mt-4">
+                    <h5>Text Preview:</h5>
+                    <div id="preview-area" class="preview-area"></div>
+                </div>
+
+                <div id="action-buttons" class="action-buttons mt-4">
+                    <button id="download-btn" class="btn btn-success">
+                        <i class="fas fa-download me-1"></i> Download
+                    </button>
+                    <button id="next-btn" class="btn btn-primary">
+                        Next <i class="fas fa-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 Document Text Extractor - Process your documents easily and safely. Coded by Tanmay Bhardwaj</p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropArea = document.getElementById('drop-area');
+            const fileInput = document.getElementById('file-input');
+            const previewArea = document.getElementById('preview-area');
+            const previewContainer = document.getElementById('preview-container');
+            const actionButtons = document.getElementById('action-buttons');
+            const downloadBtn = document.getElementById('download-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const statusArea = document.getElementById('status-area');
+            const statusMessage = document.getElementById('status-message');
+            const fileInfo = document.getElementById('file-info');
+            const fileName = document.getElementById('file-name');
+            const fileSize = document.getElementById('file-size');
+            const fileIcon = document.getElementById('file-icon');
+            
+            let extractedText = "";
+            let currentFile = null;
+
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            // Handle dropped files
+            dropArea.addEventListener('drop', handleDrop, false);
+            
+            // Handle file input change
+            fileInput.addEventListener('change', handleFiles, false);
+            
+            // Handle download button
+            downloadBtn.addEventListener('click', downloadText, false);
+            
+            // Handle next button
+            nextBtn.addEventListener('click', resetUI, false);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function highlight() {
+                dropArea.classList.add('highlight');
+            }
+
+            function unhighlight() {
+                dropArea.classList.remove('highlight');
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles({ target: { files: files } });
+            }
+
+            function handleFiles(e) {
+                const files = e.target.files;
+                if (files.length) {
+                    processFile(files[0]);
+                }
+            }
+
+            function processFile(file) {
+                currentFile = file;
+                
+                // Update file info display
+                fileName.textContent = file.name;
+                fileSize.textContent = `Size: ${formatFileSize(file.size)}`;
+                fileInfo.classList.add('show');
+                
+                // Set appropriate icon based on file type
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                let iconClass = 'fas fa-file-alt';
+                
+                switch(fileExtension) {
+                    case 'pdf':
+                        iconClass = 'fas fa-file-pdf';
+                        break;
+                    case 'docx':
+                        iconClass = 'fas fa-file-word';
+                        break;
+                    case 'pptx':
+                        iconClass = 'fas fa-file-powerpoint';
+                        break;
+                    case 'md':
+                        iconClass = 'fas fa-file-code';
+                        break;
+                }
+                
+                fileIcon.className = `file-icon ${iconClass} text-primary`;
+                
+                // Show processing status
+                showStatus('Processing your file...', 'info');
+                
+                // Send file to server for processing
+                extractTextFromFile(file);
+            }
+
+            function extractTextFromFile(file) {
+                // Create a FormData object to send the file to the server
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Send the file to the server using fetch API
+                fetch('/extract', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Server responded with an error');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    // Set the extracted text from the server response
+                    extractedText = data.text;
+                    
+                    // Show the extracted text in the preview
+                    showPreview(extractedText);
+                    showStatus('Text extraction complete!', 'success');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showStatus(`Error: ${error.message}`, 'danger');
+                });
+            }
+
+            function showPreview(text) {
+                // Truncate text for preview if too long
+                const previewText = text.length > 1000 ? 
+                    text.substring(0, 1000) + "\n\n[... Text truncated for preview. Download to see full content ...]" :
+                    text;
+                
+                previewArea.textContent = previewText;
+                previewArea.classList.add('show');
+                actionButtons.classList.add('show');
+            }
+
+            function downloadText() {
+                if (!extractedText) return;
+                
+                // Send the extracted text to the server for download
+                fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: extractedText,
+                        filename: `extracted_text_${currentFile.name.split('.')[0]}.txt`
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error preparing download');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `extracted_text_${currentFile.name.split('.')[0]}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showStatus('Text file downloaded successfully!', 'success');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showStatus(`Error downloading: ${error.message}`, 'danger');
+                });
+            }
+
+            function resetUI() {
+                // Reset all UI elements as if starting fresh
+                previewArea.textContent = '';
+                previewArea.classList.remove('show');
+                actionButtons.classList.remove('show');
+                fileInfo.classList.remove('show');
+                statusArea.classList.add('d-none');
+                
+                // Reset file input
+                fileInput.value = '';
+                
+                // Reset variables
+                extractedText = "";
+                currentFile = null;
+            }
+
+            function showStatus(message, type) {
+                statusMessage.textContent = message;
+                statusArea.className = `status-area alert alert-${type}`;
+                statusArea.classList.remove('d-none');
+                
+                // Hide spinner if success or error
+                if (type === 'success' || type === 'danger') {
+                    document.getElementById('processing-spinner').classList.add('d-none');
+                } else {
+                    document.getElementById('processing-spinner').classList.remove('d-none');
+                }
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+    </script>
+</body>
+</html>
